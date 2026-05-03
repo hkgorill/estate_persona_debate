@@ -31,5 +31,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
 
-      - name: Syntax check (app.py)
-        run: python -m py_compile app.py
+      - name: Syntax check (앱·모듈·pages)
+        run: |
+          python -m py_compile app.py gemini_common.py debate_estate.py article_sages.py
+          python -m compileall -q pages
