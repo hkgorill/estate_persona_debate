@@ -33,5 +33,5 @@ jobs:
 
       - name: Syntax check (앱·모듈·pages)
         run: |
-          python -m py_compile app.py gemini_common.py debate_estate.py article_sages.py
+          python -m py_compile app.py gemini_common.py debate_estate.py persona_presets.py article_persona_chains.py
           python -m compileall -q pages

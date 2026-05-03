@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""2. 시대의 현인 페르소나 기사 논평 — 조언자 3명 선택·기타 입력 가능."""
+"""3. 주식 기사 — 투자 석학 페르소나 3명 선택·기타 입력 가능."""
 
 from __future__ import annotations
 
@@ -18,50 +18,50 @@ from gemini_common import (
     streamlit_gemini_error_hints,
 )
 from persona_presets import (
-    BODY_LABEL_GENERAL,
-    MODERATOR_PHILOSOPHY,
+    BODY_LABEL_STOCK,
+    MODERATOR_INVESTMENT,
     OTHER_OPTION_LABEL,
-    philosophy_option_names,
-    resolve_philosophy,
+    investor_option_names,
+    resolve_investor,
 )
 
-st.set_page_config(page_title="2. 기사 TEXT 논평", page_icon="📜", layout="wide")
+st.set_page_config(page_title="3. 주식 기사 논평", page_icon="📈", layout="wide")
 
-st.title("📜 2. 기사 TEXT 논평 (시대의 현인)")
+st.title("📈 3. 주식 기사 석학 논평")
 st.caption(
-    "아래에서 **조언을 구할 현인 3명**을 고릅니다. 목록에 없으면 **기타**를 선택하고 역할을 직접 적어 주세요. "
-    "역할 연기이며 실제 인물의 발언이 아닙니다. 본문은 직접 붙여 넣어 주세요."
+    "**조언을 구할 석학 3명**을 고릅니다(각 10명 프리셋 + 기타). "
+    "**투자 자문·매매 추천이 아닙니다.** 본문은 직접 붙여 넣어 주세요."
 )
 
-model_name, temperature = render_sidebar_llm_settings(default_temperature=0.6)
+model_name, temperature = render_sidebar_llm_settings(default_temperature=0.55)
 
-_opts = philosophy_option_names()
+_opts = investor_option_names()
 
-st.markdown("##### 조언자 선택 (각 10명 프리셋 + 기타)")
+st.markdown("##### 조언자 선택")
 c1, c2, c3 = st.columns(3)
 with c1:
-    sel1 = st.selectbox("조언자 1", options=_opts, index=0, key="ph_sel1")
+    sel1 = st.selectbox("조언자 1", options=_opts, index=0, key="inv_sel1")
 with c2:
-    sel2 = st.selectbox("조언자 2", options=_opts, index=1, key="ph_sel2")
+    sel2 = st.selectbox("조언자 2", options=_opts, index=1, key="inv_sel2")
 with c3:
-    sel3 = st.selectbox("조언자 3", options=_opts, index=2, key="ph_sel3")
+    sel3 = st.selectbox("조언자 3", options=_opts, index=2, key="inv_sel3")
 
 _need_other = OTHER_OPTION_LABEL in (sel1, sel2, sel3)
 if _need_other:
     st.markdown(
-        f"**{OTHER_OPTION_LABEL}**를 고른 칸에만 해당하는 설명을 적어 주세요. (프리셋만 선택한 칸은 비워 두어도 됩니다.)"
+        f"**{OTHER_OPTION_LABEL}**를 고른 칸에만 역할·관점 설명을 적어 주세요."
     )
     oc1, oc2, oc3 = st.columns(3)
     with oc1:
-        other1 = st.text_area("기타 지침 — 조언자 1", height=100, key="ph_other1", disabled=sel1 != OTHER_OPTION_LABEL)
+        other1 = st.text_area("기타 지침 — 조언자 1", height=100, key="inv_other1", disabled=sel1 != OTHER_OPTION_LABEL)
         if sel1 != OTHER_OPTION_LABEL:
             other1 = ""
     with oc2:
-        other2 = st.text_area("기타 지침 — 조언자 2", height=100, key="ph_other2", disabled=sel2 != OTHER_OPTION_LABEL)
+        other2 = st.text_area("기타 지침 — 조언자 2", height=100, key="inv_other2", disabled=sel2 != OTHER_OPTION_LABEL)
         if sel2 != OTHER_OPTION_LABEL:
             other2 = ""
     with oc3:
-        other3 = st.text_area("기타 지침 — 조언자 3", height=100, key="ph_other3", disabled=sel3 != OTHER_OPTION_LABEL)
+        other3 = st.text_area("기타 지침 — 조언자 3", height=100, key="inv_other3", disabled=sel3 != OTHER_OPTION_LABEL)
         if sel3 != OTHER_OPTION_LABEL:
             other3 = ""
 else:
@@ -69,23 +69,23 @@ else:
 
 source_url = st.text_input(
     "기사 링크 (선택)",
-    placeholder="https://... (출처 표시용)",
+    placeholder="https://... (출처 표시용, 자동 수집 없음)",
 )
 article_body = st.text_area(
-    "기사 본문 또는 논평할 텍스트 (필수)",
-    placeholder="기사 전문 또는 주요 단락을 붙여 넣으세요.",
+    "주식 관련 기사 본문 또는 텍스트 (필수)",
+    placeholder="뉴스 전문 또는 요약할 단락을 붙여 넣으세요.",
     height=220,
 )
 
-if st.button("논평 시작", type="primary"):
+if st.button("석학 논평 시작", type="primary"):
     if not article_body.strip():
         st.warning("본문이 비어 있습니다.")
         st.stop()
 
     try:
-        p1, lab1 = resolve_philosophy(sel1, other1)
-        p2, lab2 = resolve_philosophy(sel2, other2)
-        p3, lab3 = resolve_philosophy(sel3, other3)
+        p1, lab1 = resolve_investor(sel1, other1)
+        p2, lab2 = resolve_investor(sel2, other2)
+        p3, lab3 = resolve_investor(sel3, other3)
     except ValueError as e:
         st.warning(str(e))
         st.stop()
@@ -100,15 +100,15 @@ if st.button("논평 시작", type="primary"):
 
     try:
         run_1 = build_article_comment_chain(
-            p1, model_name, temperature, api_key, body_field_label=BODY_LABEL_GENERAL
+            p1, model_name, temperature, api_key, body_field_label=BODY_LABEL_STOCK
         )
         run_2 = build_article_comment_chain(
-            p2, model_name, temperature, api_key, body_field_label=BODY_LABEL_GENERAL
+            p2, model_name, temperature, api_key, body_field_label=BODY_LABEL_STOCK
         )
         run_3 = build_article_comment_chain(
-            p3, model_name, temperature, api_key, body_field_label=BODY_LABEL_GENERAL
+            p3, model_name, temperature, api_key, body_field_label=BODY_LABEL_STOCK
         )
-        run_mod = build_freeform_moderator_chain(MODERATOR_PHILOSOPHY, model_name, temperature, api_key)
+        run_mod = build_freeform_moderator_chain(MODERATOR_INVESTMENT, model_name, temperature, api_key)
     except Exception as e:
         st.error("모델 초기화 오류")
         st.code(traceback.format_exc())
@@ -116,7 +116,7 @@ if st.button("논평 시작", type="primary"):
         st.stop()
 
     st.divider()
-    st.subheader("논평 진행")
+    st.subheader("석학 논평 진행")
 
     try:
         with st.spinner(f"{lab1} …"):
@@ -149,4 +149,4 @@ if st.button("논평 시작", type="primary"):
             st.code(tb)
 
 else:
-    st.info("조언자를 선택하고 본문을 입력한 뒤 **논평 시작**을 눌러 주세요.")
+    st.info("조언자를 선택하고 본문을 입력한 뒤 **석학 논평 시작**을 눌러 주세요.")

@@ -12,13 +12,15 @@
 |:---:|:---|:---|
 | **홈** | `app.py` | 서비스 안내, 폴더·모듈 구조 요약 |
 | **1** | `pages/1_부동산_심의.py` | 부동산 주소·물건 정보 입력 → **시장분석가 · 비관론자 · 세무/재무** 순차 발언 → 종합 투자 의견 |
-| **2** | `pages/2_기사_TEXT_논평.py` | 기사 **본문**(필수)·**링크**(선택) → **맹자 · 순자 · 쇼펜하우어** 순차 논평 → 사회자 종합 메모 |
-| **3** | `pages/3_추후_확장.py` | 이후 기능 추가용 플레이스홀더 |
+| **2** | `pages/2_기사_TEXT_논평.py` | 기사 **본문**(필수)·**링크**(선택) → **조언자 3명** 각각 **프리셋 10인**(맹자·순자·쇼펜하우어·노자 등) 또는 **기타(직접 입력)** 선택 → 순차 논평 → 종합 메모 |
+| **3** | `pages/3_주식_기사_석학논평.py` | 주식 기사 **본문**(필수)·**링크**(선택) → **조언자 3명** 각각 **프리셋 10인**(버핏·그레이엄·린치·케인스 등) 또는 **기타** → 순차 논평 → 종합 메모 |
+| **4** | `pages/4_추후_확장.py` | 이후 기능 추가용 플레이스홀더 |
 
 **안내**
 
 - 부동산 결과는 **참고용 시뮬레이션**이며 법률·세무·투자 자문이 아닙니다.
-- 기사 논평은 역사·철학 인물을 참고한 **페르소나 역할 연기**이며, 실제 인물의 발언이 아닙니다.
+- 일반·주식 기사 논평은 **페르소나 역할 연기**이며 실제 인물의 발언이 아닙니다.
+- **주식 페이지 출력은 투자 자문·특정 종목 매매 추천이 아닙니다.**
 - 기사 URL만 입력해도 **본문은 자동으로 가져오지 않습니다.** 저작권·이용약관 이슈를 피하기 위해 텍스트는 사용자가 직접 붙여 넣는 방식입니다.
 
 ---
@@ -121,8 +123,9 @@ python -m streamlit run app.py
 | `app.py` | 홈 UI만 담당 (진입점) |
 | `gemini_common.py` | API 키 로드(`.env` + `st.secrets`), `make_llm`, 사이드바 모델 설정 UI, 공통 에러 힌트 |
 | `debate_estate.py` | 부동산 위원 **시스템 프롬프트** 및 LangChain 체인 (UI 없음) |
-| `article_sages.py` | 기사 논평 **시스템 프롬프트** 및 LangChain 체인 (UI 없음) |
-| `pages/*.py` | 페이지별 Streamlit UI만 유지 (도메인 로직은 위 모듈에서 import) |
+| `persona_presets.py` | 기사·주식 논평용 페르소나 **프리셋 각 10명** + **기타** 지침 래핑, 사회자 시스템 프롬프트 |
+| `article_persona_chains.py` | 기사 본문 논평·라벨 기반 종합 메모용 LangChain 체인 |
+| `pages/*.py` | 페이지별 Streamlit UI (2·3번은 Selectbox로 조합 선택) |
 
 새 기능을 추가할 때는 **`pages/`에 페이지 추가** + 필요 시 **`gemini_common` + 도메인 모듈** 패턴을 따르면 됩니다.
 
@@ -135,11 +138,13 @@ estate_persona_debate/
 ├── app.py
 ├── gemini_common.py
 ├── debate_estate.py
-├── article_sages.py
+├── persona_presets.py
+├── article_persona_chains.py
 ├── pages/
 │   ├── 1_부동산_심의.py
 │   ├── 2_기사_TEXT_논평.py
-│   └── 3_추후_확장.py
+│   ├── 3_주식_기사_석학논평.py
+│   └── 4_추후_확장.py
 ├── requirements.txt
 ├── .env.example
 ├── .gitignore
@@ -155,7 +160,7 @@ estate_persona_debate/
 |------|------|
 | 파일 | [`.github/workflows/ci.yml`](./.github/workflows/ci.yml) |
 | 트리거 | 브랜치 `main` 또는 `master`에 대한 `push`, `pull_request` |
-| 작업 | Python 3.11·3.12 매트릭스에서 `pip install -r requirements.txt` 후 `app.py`, `gemini_common.py`, `debate_estate.py`, `article_sages.py`의 `py_compile` 및 `pages/`의 `compileall` |
+| 작업 | 의존성 설치 후 루트 모듈(`persona_presets.py`, `article_persona_chains.py` 등) `py_compile` 및 `pages/` `compileall` |
 
 CI에서는 **Gemini API를 호출하지 않습니다.** 따라서 GitHub 저장소에 API 키 시크릿을 넣을 필요는 없습니다.
 
