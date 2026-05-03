@@ -1,0 +1,9 @@
+# 부동산 가상 투자 심의 위원회 — 의존성 목록
+# 설치: pip install -r requirements.txt
+
+streamlit>=1.28.0
+python-dotenv>=1.0.0
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-google-genai>=2.0.0
+google-generativeai>=0.8.0
