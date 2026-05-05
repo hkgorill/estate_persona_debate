@@ -16,6 +16,13 @@ from gemini_common import (
     render_sidebar_llm_settings,
     streamlit_gemini_error_hints,
 )
+from llm_usage import (
+    USAGE_NOTE,
+    format_usage_caption,
+    merge_usage_totals,
+    new_usage_handler,
+    usage_invoke_config,
+)
 from session_export import export_availability, log_youtube_session, new_session_id
 from youtube_transcript_api import YouTubeTranscriptApiException
 from youtube_transcript_util import (
@@ -106,13 +113,17 @@ if run_clicked:
                 try:
                     llm = make_llm(model_name, temperature, api_key)
                     chain = prompt | llm | StrOutputParser()
+                    usage_cb = new_usage_handler()
+                    cfg = usage_invoke_config(usage_cb)
                     with st.spinner("요약 생성 중…"):
                         summary = chain.invoke(
                             {
                                 "url": youtube_url.strip(),
                                 "transcript": transcript_for_llm,
-                            }
+                            },
+                            config=cfg,
                         )
+                    usage_totals = merge_usage_totals(usage_cb)
                     st.session_state.p4_youtube_log = {
                         "session_id": new_session_id(),
                         "youtube_url": youtube_url.strip(),
@@ -120,6 +131,7 @@ if run_clicked:
                         "summary": summary,
                         "model_name": model_name,
                         "temperature": temperature,
+                        "usage_totals": usage_totals,
                     }
                 except Exception as e:
                     st.error("요약 생성 오류")
@@ -149,6 +161,10 @@ st.divider()
 st.subheader("요약")
 st.markdown(log_data["summary"])
 
+st.caption(format_usage_caption(log_data.get("usage_totals") or {}))
+with st.expander("토큰 수 안내"):
+    st.caption(USAGE_NOTE)
+
 with st.expander("참고: 사용한 자막 일부(미리보기)"):
     preview = log_data["transcript_full"][:8000] + (
         "…" if len(log_data["transcript_full"]) > 8000 else ""
@@ -164,6 +180,7 @@ if _av["notion"] or _av["sheets"]:
             summary=log_data["summary"],
             model_name=log_data["model_name"],
             temperature=log_data["temperature"],
+            usage_totals=log_data.get("usage_totals"),
         )
         if "오류" in msg:
             st.warning(msg)

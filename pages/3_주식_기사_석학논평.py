@@ -24,6 +24,13 @@ from persona_presets import (
     investor_option_names,
     resolve_investor,
 )
+from llm_usage import (
+    USAGE_NOTE,
+    format_usage_caption,
+    merge_usage_totals,
+    new_usage_handler,
+    usage_invoke_config,
+)
 from session_export import export_availability, log_article_session, new_session_id
 
 st.set_page_config(page_title="3. 주식 기사 논평", page_icon="📈", layout="wide")
@@ -129,14 +136,19 @@ if run_clicked:
                     st.session_state.p3_stock_log = None
                 else:
                     try:
+                        usage_cb = new_usage_handler()
+                        cfg = usage_invoke_config(usage_cb)
                         with st.spinner(f"{lab1} …"):
-                            o1 = run_1(url_disp, body)
+                            o1 = run_1(url_disp, body, config=cfg)
                         with st.spinner(f"{lab2} …"):
-                            o2 = run_2(url_disp, body)
+                            o2 = run_2(url_disp, body, config=cfg)
                         with st.spinner(f"{lab3} …"):
-                            o3 = run_3(url_disp, body)
+                            o3 = run_3(url_disp, body, config=cfg)
                         with st.spinner("사회자 종합 메모 …"):
-                            summary = run_mod(url_disp, body, lab1, o1, lab2, o2, lab3, o3)
+                            summary = run_mod(
+                                url_disp, body, lab1, o1, lab2, o2, lab3, o3, config=cfg
+                            )
+                        usage_totals = merge_usage_totals(usage_cb)
                         st.session_state.p3_stock_log = {
                             "session_id": new_session_id(),
                             "source_url": url_disp,
@@ -150,6 +162,7 @@ if run_clicked:
                             "summary": summary,
                             "model_name": model_name,
                             "temperature": temperature,
+                            "usage_totals": usage_totals,
                         }
                     except Exception:
                         st.error("호출 중 오류가 발생했습니다.")
@@ -178,6 +191,10 @@ st.divider()
 st.markdown("### 종합 메모")
 st.success(log_data["summary"])
 
+st.caption(format_usage_caption(log_data.get("usage_totals") or {}))
+with st.expander("토큰 수 안내"):
+    st.caption(USAGE_NOTE)
+
 if _av["notion"] or _av["sheets"]:
     if st.button("Notion·Google Sheets에 기록", type="secondary", key="p3_export_btn"):
         msg = log_article_session(
@@ -196,6 +213,7 @@ if _av["notion"] or _av["sheets"]:
             page_label="3 주식",
             page_code="3_stock",
             title_prefix="[주식]",
+            usage_totals=log_data.get("usage_totals"),
         )
         if "오류" in msg:
             st.warning(msg)

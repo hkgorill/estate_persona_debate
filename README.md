@@ -108,6 +108,7 @@ Copy-Item .env.example .env
      - **Name** (제목)
      - **페이지** (선택) — 옵션을 정확히 추가: `1 부동산`, `2 기사`, `3 주식`, `4 유튜브`
      - **질문**, **요약 답변**, **세션 ID**, **모델** (본문)
+     - **토큰 입력**, **토큰 출력**, **토큰 합계** (숫자 — LangChain `usage_metadata` 합계, 청구 단위와 다를 수 있음)
      - **실행일시** (날짜: 시간 포함)
    - 데이터베이스 페이지 **⋯ → 연결(Connections)** 에서 위 Integration 을 연결합니다.
    - DB URL 에서 **데이터베이스 ID**를 복사해 `NOTION_DATABASE_ID`에 넣습니다.
@@ -115,7 +116,8 @@ Copy-Item .env.example .env
 2. **Google Sheets**
    - Google Cloud 프로젝트에서 **Google Sheets API** 활성화 → **서비스 계정** 생성 → **JSON 키** 다운로드.
    - 새 스프레드시트를 만들고, **1행**에 아래 **헤더**(영문·순서 고정)를 입력합니다.  
-     `session_id`, `created_at`, `page`, `model_name`, `temperature`, `part`, `input_full`, `output_full`
+     `session_id`, `created_at`, `page`, `model_name`, `temperature`, `part`, `input_full`, `output_full`, `input_tokens`, `output_tokens`, `total_tokens`  
+     (기존 시트에 열이 없으면 **위 순서대로** 새 열을 추가하세요. 같은 `session_id`로 여러 행이 생길 때 토큰 값은 **첫 행(part 0)** 에만 채워지고 나머지는 비워 둡니다.)
    - 스프레드시트 **공유**에 서비스 계정 이메일(`…@…iam.gserviceaccount.com`)을 **편집자**로 추가합니다.
    - `GOOGLE_SHEETS_SPREADSHEET_ID`에는 스프레드시트 **ID** 또는 브라우저 **URL 전체**를 넣을 수 있습니다. 서비스 계정은 **`GOOGLE_SHEETS_CREDENTIALS_PATH`(파일 경로)** 가 가장 안정적입니다. `.env` 한 줄 JSON(`GOOGLE_SHEETS_CREDENTIALS_JSON`)은 따옴표·이스케이프 때문에 실패하기 쉬우며, 그럴 때는 **`GOOGLE_SHEETS_CREDENTIALS_JSON_B64`**(JSON 파일을 Base64 인코딩) 또는 파일 경로만 쓰면 됩니다. 인라인 JSON을 여러 줄로 넣으면 **그 아래 줄의 환경 변수가 통째로 로드되지 않을 수 있으므로**, 문제가 나면 `GOOGLE_SHEETS_CREDENTIALS_JSON` 항목을 **비우거나 삭제**하고 경로 변수만 두는 것이 안전합니다. **Windows 사용자 환경 변수**에 예전에 넣어 둔 `GOOGLE_SHEETS_CREDENTIALS_JSON` 은 주석 처리만으로는 사라지지 않습니다. `.env`에 빈 줄 `GOOGLE_SHEETS_CREDENTIALS_JSON=` 을 두면 앱이 해당 키를 비우도록 덮어씁니다.
 

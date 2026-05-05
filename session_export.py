@@ -15,6 +15,8 @@ from typing import Any, Final
 
 from dotenv import load_dotenv
 
+from llm_usage import totals_for_notion_sheet
+
 # 프로젝트 루트 `.env` (실행 cwd 와 무관하게 로드)
 _REPO_ROOT = Path(__file__).resolve().parent
 load_dotenv(_REPO_ROOT / ".env")
@@ -57,6 +59,9 @@ NOTION_PROP_SUMMARY: Final[str] = "요약 답변"  # Rich text
 NOTION_PROP_DATETIME: Final[str] = "실행일시"  # Date
 NOTION_PROP_SESSION: Final[str] = "세션 ID"  # Rich text
 NOTION_PROP_MODEL: Final[str] = "모델"  # Rich text
+NOTION_PROP_TOKEN_IN: Final[str] = "토큰 입력"  # Number (API usage 합계)
+NOTION_PROP_TOKEN_OUT: Final[str] = "토큰 출력"  # Number
+NOTION_PROP_TOKEN_TOTAL: Final[str] = "토큰 합계"  # Number
 
 NOTION_PAGE_OPTIONS: Final[tuple[str, ...]] = ("1 부동산", "2 기사", "3 주식", "4 유튜브")
 
@@ -69,6 +74,9 @@ SHEET_HEADERS: Final[tuple[str, ...]] = (
     "part",
     "input_full",
     "output_full",
+    "input_tokens",
+    "output_tokens",
+    "total_tokens",
 )
 
 _MAX_NOTION_TEXT: Final[int] = 2000
@@ -333,6 +341,9 @@ def append_to_notion(
     session_id: str,
     model_name: str,
     started_at: datetime | None = None,
+    token_input: int = 0,
+    token_output: int = 0,
+    token_total: int = 0,
 ) -> None:
     """Notion 데이터베이스에 페이지 한 건 추가."""
     token = get_notion_token()
@@ -356,6 +367,9 @@ def append_to_notion(
         NOTION_PROP_DATETIME: {"date": {"start": notion_dt}},
         NOTION_PROP_SESSION: _rich_text_prop(session_id),
         NOTION_PROP_MODEL: _rich_text_prop(model_name),
+        NOTION_PROP_TOKEN_IN: {"number": token_input},
+        NOTION_PROP_TOKEN_OUT: {"number": token_output},
+        NOTION_PROP_TOKEN_TOTAL: {"number": token_total},
     }
     client.pages.create(parent={"database_id": db_id.replace("-", "")}, properties=props)
 
@@ -376,6 +390,9 @@ def append_to_google_sheet(
     input_full: str,
     output_full: str,
     created_at: datetime | None = None,
+    token_input: int = 0,
+    token_output: int = 0,
+    token_total: int = 0,
 ) -> None:
     """스프레드시트에 행 추가. 셀 초과 시 같은 session_id로 여러 행(part)."""
     creds_dict = _load_google_credentials_dict()
@@ -409,6 +426,9 @@ def append_to_google_sheet(
     out_parts += [""] * (n - len(out_parts))
 
     rows: list[list[Any]] = []
+    tok_in_s = str(int(token_input))
+    tok_out_s = str(int(token_output))
+    tok_ttl_s = str(int(token_total))
     for i in range(n):
         rows.append(
             [
@@ -420,6 +440,9 @@ def append_to_google_sheet(
                 str(i),
                 in_parts[i],
                 out_parts[i],
+                tok_in_s if i == 0 else "",
+                tok_out_s if i == 0 else "",
+                tok_ttl_s if i == 0 else "",
             ]
         )
 
@@ -441,6 +464,7 @@ def log_estate_session(
     summary: str,
     model_name: str,
     temperature: float,
+    usage_totals: dict[str, Any] | None = None,
 ) -> str:
     """부동산 심의 결과 기록."""
     av = export_availability()
@@ -454,6 +478,7 @@ def log_estate_session(
         f"【시장분석가】\n{out1}\n\n【비관론자】\n{out2}\n\n【세무/재무】\n{out3}\n\n【종합】\n{summary}"
     )
     now = datetime.now(timezone.utc)
+    tin, tout, tttl = totals_for_notion_sheet(usage_totals)
     parts: list[str] = []
 
     if av["notion"]:
@@ -466,6 +491,9 @@ def log_estate_session(
                 session_id=session_id,
                 model_name=model_name,
                 started_at=now,
+                token_input=tin,
+                token_output=tout,
+                token_total=tttl,
             )
             parts.append("Notion ✓")
         except Exception as e:
@@ -483,6 +511,9 @@ def log_estate_session(
                 input_full=full_in,
                 output_full=full_out,
                 created_at=now,
+                token_input=tin,
+                token_output=tout,
+                token_total=tttl,
             )
             parts.append("Sheets ✓")
         except Exception as e:
@@ -510,6 +541,7 @@ def log_article_session(
     page_label: str,
     page_code: str,
     title_prefix: str,
+    usage_totals: dict[str, Any] | None = None,
 ) -> str:
     """기사 논평(철학/일반) 결과 기록."""
     av = export_availability()
@@ -528,6 +560,7 @@ def log_article_session(
         f"【{lab1}】\n{o1}\n\n【{lab2}】\n{o2}\n\n【{lab3}】\n{o3}\n\n【종합 메모】\n{summary}"
     )
     now = datetime.now(timezone.utc)
+    tin, tout, tttl = totals_for_notion_sheet(usage_totals)
     parts: list[str] = []
 
     if av["notion"]:
@@ -540,6 +573,9 @@ def log_article_session(
                 session_id=session_id,
                 model_name=model_name,
                 started_at=now,
+                token_input=tin,
+                token_output=tout,
+                token_total=tttl,
             )
             parts.append("Notion ✓")
         except Exception as e:
@@ -557,6 +593,9 @@ def log_article_session(
                 input_full=full_in,
                 output_full=full_out,
                 created_at=now,
+                token_input=tin,
+                token_output=tout,
+                token_total=tttl,
             )
             parts.append("Sheets ✓")
         except Exception as e:
@@ -575,6 +614,7 @@ def log_youtube_session(
     summary: str,
     model_name: str,
     temperature: float,
+    usage_totals: dict[str, Any] | None = None,
 ) -> str:
     av = export_availability()
     if not av["notion"] and not av["sheets"]:
@@ -585,6 +625,7 @@ def log_youtube_session(
     full_in = f"【URL】\n{youtube_url.strip()}\n\n【자막 전체】\n{transcript_full}"
     full_out = f"【요약】\n{summary}"
     now = datetime.now(timezone.utc)
+    tin, tout, tttl = totals_for_notion_sheet(usage_totals)
     parts: list[str] = []
 
     if av["notion"]:
@@ -597,6 +638,9 @@ def log_youtube_session(
                 session_id=session_id,
                 model_name=model_name,
                 started_at=now,
+                token_input=tin,
+                token_output=tout,
+                token_total=tttl,
             )
             parts.append("Notion ✓")
         except Exception as e:
@@ -614,6 +658,9 @@ def log_youtube_session(
                 input_full=full_in,
                 output_full=full_out,
                 created_at=now,
+                token_input=tin,
+                token_output=tout,
+                token_total=tttl,
             )
             parts.append("Sheets ✓")
         except Exception as e:

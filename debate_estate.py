@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import Any, Callable
 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -76,7 +76,11 @@ def build_estate_agent_chain(
     )
     llm = make_llm(model_name, temperature, api_key)
     chain = prompt | llm | StrOutputParser()
-    return chain.invoke
+
+    def _invoke(property_text: str, config: dict[str, Any] | None = None) -> str:
+        return chain.invoke(property_text, config=config)
+
+    return _invoke
 
 
 def build_estate_summary_chain(
@@ -100,9 +104,16 @@ def build_estate_summary_chain(
     llm = make_llm(model_name, temperature, api_key)
     chain = prompt | llm | StrOutputParser()
 
-    def _invoke(property_text: str, a1: str, a2: str, a3: str) -> str:
+    def _invoke(
+        property_text: str,
+        a1: str,
+        a2: str,
+        a3: str,
+        config: dict[str, Any] | None = None,
+    ) -> str:
         return chain.invoke(
-            {"property_text": property_text, "agent1": a1, "agent2": a2, "agent3": a3}
+            {"property_text": property_text, "agent1": a1, "agent2": a2, "agent3": a3},
+            config=config,
         )
 
     return _invoke

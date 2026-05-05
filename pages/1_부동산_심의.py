@@ -20,6 +20,13 @@ from gemini_common import (
     render_sidebar_llm_settings,
     streamlit_gemini_error_hints,
 )
+from llm_usage import (
+    USAGE_NOTE,
+    format_usage_caption,
+    merge_usage_totals,
+    new_usage_handler,
+    usage_invoke_config,
+)
 from session_export import export_availability, log_estate_session, new_session_id
 
 st.set_page_config(page_title="1. 부동산 심의", page_icon="🏛️", layout="wide")
@@ -78,14 +85,17 @@ if start:
             else:
                 prop = property_text.strip()
                 try:
+                    usage_cb = new_usage_handler()
+                    cfg = usage_invoke_config(usage_cb)
                     with st.spinner("에이전트 1 (시장분석가 📈) …"):
-                        out1 = run_market(prop)
+                        out1 = run_market(prop, config=cfg)
                     with st.spinner("에이전트 2 (비관론자 ⚠️) …"):
-                        out2 = run_skeptic(prop)
+                        out2 = run_skeptic(prop, config=cfg)
                     with st.spinner("에이전트 3 (세무/재무 💰) …"):
-                        out3 = run_tax(prop)
+                        out3 = run_tax(prop, config=cfg)
                     with st.spinner("의장 종합 요약 …"):
-                        summary = run_summary(prop, out1, out2, out3)
+                        summary = run_summary(prop, out1, out2, out3, config=cfg)
+                    usage_totals = merge_usage_totals(usage_cb)
                     st.session_state.p1_estate_log = {
                         "session_id": new_session_id(),
                         "property_text": prop,
@@ -95,6 +105,7 @@ if start:
                         "summary": summary,
                         "model_name": model_name,
                         "temperature": temperature,
+                        "usage_totals": usage_totals,
                     }
                 except Exception:
                     st.error("심의 진행 중 오류가 발생했습니다.")
@@ -123,6 +134,10 @@ st.divider()
 st.markdown("### 종합 투자 의견 및 핵심 고려사항")
 st.success(log_data["summary"])
 
+st.caption(format_usage_caption(log_data.get("usage_totals") or {}))
+with st.expander("토큰 수 안내"):
+    st.caption(USAGE_NOTE)
+
 if _av["notion"] or _av["sheets"]:
     if st.button("Notion·Google Sheets에 기록", type="secondary", key="p1_export_btn"):
         msg = log_estate_session(
@@ -134,6 +149,7 @@ if _av["notion"] or _av["sheets"]:
             summary=log_data["summary"],
             model_name=log_data["model_name"],
             temperature=log_data["temperature"],
+            usage_totals=log_data.get("usage_totals"),
         )
         if "오류" in msg:
             st.warning(msg)

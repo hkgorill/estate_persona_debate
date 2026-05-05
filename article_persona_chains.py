@@ -3,7 +3,7 @@
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import Any, Callable
 
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate
@@ -34,8 +34,15 @@ def build_article_comment_chain(
     llm = make_llm(model_name, temperature, api_key)
     chain = prompt | llm | StrOutputParser()
 
-    def _invoke(source_url: str, article_body: str) -> str:
-        return chain.invoke({"source_url": source_url, "article_body": article_body})
+    def _invoke(
+        source_url: str,
+        article_body: str,
+        config: dict[str, Any] | None = None,
+    ) -> str:
+        return chain.invoke(
+            {"source_url": source_url, "article_body": article_body},
+            config=config,
+        )
 
     return _invoke
 
@@ -72,6 +79,7 @@ def build_freeform_moderator_chain(
         o2: str,
         n3: str,
         o3: str,
+        config: dict[str, Any] | None = None,
     ) -> str:
         return chain.invoke(
             {
@@ -83,7 +91,8 @@ def build_freeform_moderator_chain(
                 "o2": o2,
                 "n3": n3,
                 "o3": o3,
-            }
+            },
+            config=config,
         )
 
     return _invoke
