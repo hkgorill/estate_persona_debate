@@ -8,3 +8,6 @@ langchain-core>=0.3.0
 langchain-google-genai>=2.0.0
 google-generativeai>=0.8.0
 youtube-transcript-api>=1.2.0
+notion-client>=2.2.0
+gspread>=6.0.0
+google-auth>=2.0.0

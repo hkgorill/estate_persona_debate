@@ -24,6 +24,7 @@ from persona_presets import (
     philosophy_option_names,
     resolve_philosophy,
 )
+from session_export import export_availability, log_article_session, new_session_id
 
 st.set_page_config(page_title="2. 기사 TEXT 논평", page_icon="📜", layout="wide")
 
@@ -33,7 +34,16 @@ st.caption(
     "역할 연기이며 실제 인물의 발언이 아닙니다. 본문은 직접 붙여 넣어 주세요."
 )
 
+_av = export_availability()
+if _av["notion"] or _av["sheets"]:
+    st.caption(
+        "기록: Notion·Sheets 환경이 감지되었습니다. 실행 후 **Notion·Google Sheets에 기록**으로 저장할 수 있습니다."
+    )
+
 model_name, temperature = render_sidebar_llm_settings(default_temperature=0.6)
+
+if "p2_article_log" not in st.session_state:
+    st.session_state.p2_article_log = None
 
 _opts = philosophy_option_names()
 
@@ -77,76 +87,117 @@ article_body = st.text_area(
     height=220,
 )
 
-if st.button("논평 시작", type="primary"):
+run_clicked = st.button("논평 시작", type="primary")
+
+if run_clicked:
     if not article_body.strip():
         st.warning("본문이 비어 있습니다.")
-        st.stop()
+        st.session_state.p2_article_log = None
+    else:
+        try:
+            p1, lab1 = resolve_philosophy(sel1, other1)
+            p2, lab2 = resolve_philosophy(sel2, other2)
+            p3, lab3 = resolve_philosophy(sel3, other3)
+        except ValueError as e:
+            st.warning(str(e))
+            st.session_state.p2_article_log = None
+        else:
+            api_key = get_gemini_api_key()
+            if not api_key:
+                st.error(api_key_missing_markdown())
+                st.session_state.p2_article_log = None
+            else:
+                url_disp = source_url.strip() if source_url else "(없음)"
+                body = article_body.strip()
+                try:
+                    run_1 = build_article_comment_chain(
+                        p1, model_name, temperature, api_key, body_field_label=BODY_LABEL_GENERAL
+                    )
+                    run_2 = build_article_comment_chain(
+                        p2, model_name, temperature, api_key, body_field_label=BODY_LABEL_GENERAL
+                    )
+                    run_3 = build_article_comment_chain(
+                        p3, model_name, temperature, api_key, body_field_label=BODY_LABEL_GENERAL
+                    )
+                    run_mod = build_freeform_moderator_chain(
+                        MODERATOR_PHILOSOPHY, model_name, temperature, api_key
+                    )
+                except Exception as e:
+                    st.error("모델 초기화 오류")
+                    st.code(traceback.format_exc())
+                    st.caption(str(e))
+                    st.session_state.p2_article_log = None
+                else:
+                    try:
+                        with st.spinner(f"{lab1} …"):
+                            o1 = run_1(url_disp, body)
+                        with st.spinner(f"{lab2} …"):
+                            o2 = run_2(url_disp, body)
+                        with st.spinner(f"{lab3} …"):
+                            o3 = run_3(url_disp, body)
+                        with st.spinner("사회자 종합 메모 …"):
+                            summary = run_mod(url_disp, body, lab1, o1, lab2, o2, lab3, o3)
+                        st.session_state.p2_article_log = {
+                            "session_id": new_session_id(),
+                            "source_url": url_disp,
+                            "article_body": body,
+                            "lab1": lab1,
+                            "lab2": lab2,
+                            "lab3": lab3,
+                            "o1": o1,
+                            "o2": o2,
+                            "o3": o3,
+                            "summary": summary,
+                            "model_name": model_name,
+                            "temperature": temperature,
+                        }
+                    except Exception:
+                        st.error("호출 중 오류가 발생했습니다.")
+                        tb = traceback.format_exc()
+                        streamlit_gemini_error_hints(tb)
+                        with st.expander("기술 상세"):
+                            st.code(tb)
+                        st.session_state.p2_article_log = None
 
-    try:
-        p1, lab1 = resolve_philosophy(sel1, other1)
-        p2, lab2 = resolve_philosophy(sel2, other2)
-        p3, lab3 = resolve_philosophy(sel3, other3)
-    except ValueError as e:
-        st.warning(str(e))
-        st.stop()
+log_data = st.session_state.p2_article_log
 
-    api_key = get_gemini_api_key()
-    if not api_key:
-        st.error(api_key_missing_markdown())
-        st.stop()
-
-    url_disp = source_url.strip() if source_url else "(없음)"
-    body = article_body.strip()
-
-    try:
-        run_1 = build_article_comment_chain(
-            p1, model_name, temperature, api_key, body_field_label=BODY_LABEL_GENERAL
-        )
-        run_2 = build_article_comment_chain(
-            p2, model_name, temperature, api_key, body_field_label=BODY_LABEL_GENERAL
-        )
-        run_3 = build_article_comment_chain(
-            p3, model_name, temperature, api_key, body_field_label=BODY_LABEL_GENERAL
-        )
-        run_mod = build_freeform_moderator_chain(MODERATOR_PHILOSOPHY, model_name, temperature, api_key)
-    except Exception as e:
-        st.error("모델 초기화 오류")
-        st.code(traceback.format_exc())
-        st.caption(str(e))
-        st.stop()
-
-    st.divider()
-    st.subheader("논평 진행")
-
-    try:
-        with st.spinner(f"{lab1} …"):
-            o1 = run_1(url_disp, body)
-        st.markdown(f"### {lab1}")
-        st.write(o1)
-
-        with st.spinner(f"{lab2} …"):
-            o2 = run_2(url_disp, body)
-        st.markdown(f"### {lab2}")
-        st.write(o2)
-
-        with st.spinner(f"{lab3} …"):
-            o3 = run_3(url_disp, body)
-        st.markdown(f"### {lab3}")
-        st.write(o3)
-
-        with st.spinner("사회자 종합 메모 …"):
-            summary = run_mod(url_disp, body, lab1, o1, lab2, o2, lab3, o3)
-
-        st.divider()
-        st.markdown("### 종합 메모")
-        st.success(summary)
-
-    except Exception:
-        st.error("호출 중 오류가 발생했습니다.")
-        tb = traceback.format_exc()
-        streamlit_gemini_error_hints(tb)
-        with st.expander("기술 상세"):
-            st.code(tb)
-
-else:
+if not log_data:
     st.info("조언자를 선택하고 본문을 입력한 뒤 **논평 시작**을 눌러 주세요.")
+    st.stop()
+
+st.divider()
+st.subheader("논평 진행")
+
+st.markdown(f"### {log_data['lab1']}")
+st.write(log_data["o1"])
+st.markdown(f"### {log_data['lab2']}")
+st.write(log_data["o2"])
+st.markdown(f"### {log_data['lab3']}")
+st.write(log_data["o3"])
+st.divider()
+st.markdown("### 종합 메모")
+st.success(log_data["summary"])
+
+if _av["notion"] or _av["sheets"]:
+    if st.button("Notion·Google Sheets에 기록", type="secondary", key="p2_export_btn"):
+        msg = log_article_session(
+            session_id=log_data["session_id"],
+            source_url=log_data["source_url"],
+            article_body=log_data["article_body"],
+            lab1=log_data["lab1"],
+            lab2=log_data["lab2"],
+            lab3=log_data["lab3"],
+            o1=log_data["o1"],
+            o2=log_data["o2"],
+            o3=log_data["o3"],
+            summary=log_data["summary"],
+            model_name=log_data["model_name"],
+            temperature=log_data["temperature"],
+            page_label="2 기사",
+            page_code="2_article",
+            title_prefix="[기사]",
+        )
+        if "오류" in msg:
+            st.warning(msg)
+        else:
+            st.success(msg)

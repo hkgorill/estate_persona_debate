@@ -89,6 +89,36 @@ Copy-Item .env.example .env
 
 앱 코드는 `gemini_common.py`에서 위 변수와 Streamlit Secrets를 모두 인식합니다.
 
+### Notion·Google Sheets 기록 (선택)
+
+1~4 페이지 실행 후 **「Notion·Google Sheets에 기록」** 버튼으로 저장할 수 있습니다.
+
+| 저장소 | 내용 |
+|--------|------|
+| **Notion** | 질문(요약)·요약 답변·세션 ID·모델 등 |
+| **Google Sheets** | 입력·출력 **전체**(셀 길이 초과 시 같은 `session_id`로 여러 행) |
+
+**당신이 미리 할 작업**
+
+1. **Notion**
+   - [Developers](https://www.notion.so/my-integrations)에서 Integration 생성 → **Internal Integration Secret** 복사 (`NOTION_TOKEN`).
+   - 새 **데이터베이스**를 만들고 아래 **프로퍼티**를 동일한 이름·타입으로 추가합니다.
+     - **Name** (제목)
+     - **페이지** (선택) — 옵션을 정확히 추가: `1 부동산`, `2 기사`, `3 주식`, `4 유튜브`
+     - **질문**, **요약 답변**, **세션 ID**, **모델** (본문)
+     - **실행일시** (날짜: 시간 포함)
+   - 데이터베이스 페이지 **⋯ → 연결(Connections)** 에서 위 Integration 을 연결합니다.
+   - DB URL 에서 **데이터베이스 ID**를 복사해 `NOTION_DATABASE_ID`에 넣습니다.
+
+2. **Google Sheets**
+   - Google Cloud 프로젝트에서 **Google Sheets API** 활성화 → **서비스 계정** 생성 → **JSON 키** 다운로드.
+   - 새 스프레드시트를 만들고, **1행**에 아래 **헤더**(영문·순서 고정)를 입력합니다.  
+     `session_id`, `created_at`, `page`, `model_name`, `temperature`, `part`, `input_full`, `output_full`
+   - 스프레드시트 **공유**에 서비스 계정 이메일(`…@…iam.gserviceaccount.com`)을 **편집자**로 추가합니다.
+   - 스프레드시트 URL의 **ID**를 `GOOGLE_SHEETS_SPREADSHEET_ID`에 넣고, JSON 은 `GOOGLE_SHEETS_CREDENTIALS_PATH`(파일 경로) 또는 `GOOGLE_SHEETS_CREDENTIALS_JSON`(전체 JSON 문자열)로 지정합니다.
+
+`.env` 예시는 [`.env.example`](./.env.example)에 있습니다. Streamlit Cloud 는 **Secrets**에 동일 키명으로 넣으면 됩니다.
+
 ---
 
 ## Streamlit Community Cloud (배포 시)
@@ -98,6 +128,11 @@ Copy-Item .env.example .env
 
 ```toml
 GOOGLE_API_KEY = "여기에_키"
+# 선택: Notion / Sheets 기록
+# NOTION_TOKEN = "secret_…"
+# NOTION_DATABASE_ID = "…"
+# GOOGLE_SHEETS_SPREADSHEET_ID = "…"
+# GOOGLE_SHEETS_CREDENTIALS_JSON = """{…서비스 계정 JSON…}"""
 ```
 
 저장 후 **재배포(Redeploy)** 하면 각 페이지에서 동일하게 키가 로드됩니다.
@@ -140,6 +175,8 @@ estate_persona_debate/
 ├── debate_estate.py
 ├── persona_presets.py
 ├── article_persona_chains.py
+├── session_export.py
+├── youtube_transcript_util.py
 ├── pages/
 │   ├── 1_부동산_심의.py
 │   ├── 2_기사_TEXT_논평.py
