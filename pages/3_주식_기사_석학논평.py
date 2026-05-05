@@ -7,10 +7,7 @@ import traceback
 
 import streamlit as st
 
-from article_persona_chains import (
-    build_article_comment_chain,
-    build_freeform_moderator_chain,
-)
+from article_persona_chains import build_article_unified_chain
 from gemini_common import (
     api_key_missing_markdown,
     get_gemini_api_key,
@@ -38,6 +35,7 @@ st.set_page_config(page_title="3. 주식 기사 논평", page_icon="📈", layou
 st.title("📈 3. 주식 기사 석학 논평")
 st.caption(
     "**조언을 구할 석학 3명**을 고릅니다(각 10명 프리셋 + 기타). "
+    "세 논평과 종합 메모는 **한 번의 모델 호출**로 생성합니다(본문 반복 전송 최소화). "
     "**투자 자문·매매 추천이 아닙니다.** 본문은 직접 붙여 넣어 주세요."
 )
 
@@ -117,17 +115,14 @@ if run_clicked:
                 url_disp = source_url.strip() if source_url else "(없음)"
                 body = article_body.strip()
                 try:
-                    run_1 = build_article_comment_chain(
-                        p1, model_name, temperature, api_key, body_field_label=BODY_LABEL_STOCK
-                    )
-                    run_2 = build_article_comment_chain(
-                        p2, model_name, temperature, api_key, body_field_label=BODY_LABEL_STOCK
-                    )
-                    run_3 = build_article_comment_chain(
-                        p3, model_name, temperature, api_key, body_field_label=BODY_LABEL_STOCK
-                    )
-                    run_mod = build_freeform_moderator_chain(
-                        MODERATOR_INVESTMENT, model_name, temperature, api_key
+                    run_uni = build_article_unified_chain(
+                        (p1, p2, p3),
+                        MODERATOR_INVESTMENT,
+                        model_name,
+                        temperature,
+                        api_key,
+                        body_field_label=BODY_LABEL_STOCK,
+                        persona_labels=(lab1, lab2, lab3),
                     )
                 except Exception as e:
                     st.error("모델 초기화 오류")
@@ -138,16 +133,8 @@ if run_clicked:
                     try:
                         usage_cb = new_usage_handler()
                         cfg = usage_invoke_config(usage_cb)
-                        with st.spinner(f"{lab1} …"):
-                            o1 = run_1(url_disp, body, config=cfg)
-                        with st.spinner(f"{lab2} …"):
-                            o2 = run_2(url_disp, body, config=cfg)
-                        with st.spinner(f"{lab3} …"):
-                            o3 = run_3(url_disp, body, config=cfg)
-                        with st.spinner("사회자 종합 메모 …"):
-                            summary = run_mod(
-                                url_disp, body, lab1, o1, lab2, o2, lab3, o3, config=cfg
-                            )
+                        with st.spinner("석학 3인·종합 통합 생성 중…"):
+                            o1, o2, o3, summary = run_uni(url_disp, body, config=cfg)
                         usage_totals = merge_usage_totals(usage_cb)
                         st.session_state.p3_stock_log = {
                             "session_id": new_session_id(),
@@ -164,6 +151,13 @@ if run_clicked:
                             "temperature": temperature,
                             "usage_totals": usage_totals,
                         }
+                    except ValueError as e:
+                        st.error(
+                            "모델 응답 형식 오류입니다. 구간 태그(###P1### 등)가 빠졌을 수 있습니다. "
+                            "**석학 논평 시작**을 다시 눌러 주세요."
+                        )
+                        st.caption(str(e))
+                        st.session_state.p3_stock_log = None
                     except Exception:
                         st.error("호출 중 오류가 발생했습니다.")
                         tb = traceback.format_exc()

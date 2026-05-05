@@ -7,13 +7,7 @@ import traceback
 
 import streamlit as st
 
-from debate_estate import (
-    SYSTEM_PROMPT_MARKET_ANALYST,
-    SYSTEM_PROMPT_SKEPTIC,
-    SYSTEM_PROMPT_TAX_FINANCE,
-    build_estate_agent_chain,
-    build_estate_summary_chain,
-)
+from debate_estate import build_estate_unified_chain
 from gemini_common import (
     api_key_missing_markdown,
     get_gemini_api_key,
@@ -33,7 +27,7 @@ st.set_page_config(page_title="1. 부동산 심의", page_icon="🏛️", layout
 
 st.title("🏛️ 1. 부동산 가상 투자 심의 위원회")
 st.caption(
-    "가상 에이전트 3인이 순차적으로 발언한 뒤, 종합 의견을 제시합니다. "
+    "가상 에이전트 3인과 의장 종합을 **한 번의 모델 호출**로 생성합니다(물건 정보 반복 전송을 줄여 토큰을 절감). "
     "참고용 시뮬레이션이며 법률·세무·투자 자문이 아닙니다."
 )
 
@@ -67,16 +61,7 @@ if start:
             st.session_state.p1_estate_log = None
         else:
             try:
-                run_market = build_estate_agent_chain(
-                    SYSTEM_PROMPT_MARKET_ANALYST, model_name, temperature, api_key
-                )
-                run_skeptic = build_estate_agent_chain(
-                    SYSTEM_PROMPT_SKEPTIC, model_name, temperature, api_key
-                )
-                run_tax = build_estate_agent_chain(
-                    SYSTEM_PROMPT_TAX_FINANCE, model_name, temperature, api_key
-                )
-                run_summary = build_estate_summary_chain(model_name, temperature, api_key)
+                run_unified = build_estate_unified_chain(model_name, temperature, api_key)
             except Exception as e:
                 st.error("LangChain / Gemini 초기화 오류")
                 st.code(traceback.format_exc())
@@ -87,14 +72,8 @@ if start:
                 try:
                     usage_cb = new_usage_handler()
                     cfg = usage_invoke_config(usage_cb)
-                    with st.spinner("에이전트 1 (시장분석가 📈) …"):
-                        out1 = run_market(prop, config=cfg)
-                    with st.spinner("에이전트 2 (비관론자 ⚠️) …"):
-                        out2 = run_skeptic(prop, config=cfg)
-                    with st.spinner("에이전트 3 (세무/재무 💰) …"):
-                        out3 = run_tax(prop, config=cfg)
-                    with st.spinner("의장 종합 요약 …"):
-                        summary = run_summary(prop, out1, out2, out3, config=cfg)
+                    with st.spinner("위원 3인·의장 통합 생성 중…"):
+                        out1, out2, out3, summary = run_unified(prop, config=cfg)
                     usage_totals = merge_usage_totals(usage_cb)
                     st.session_state.p1_estate_log = {
                         "session_id": new_session_id(),
@@ -107,6 +86,13 @@ if start:
                         "temperature": temperature,
                         "usage_totals": usage_totals,
                     }
+                except ValueError as e:
+                    st.error(
+                        "모델 응답 형식 오류입니다. 구간 태그(###MARKET### 등)가 빠졌거나 순서가 어긋났을 수 있습니다. "
+                        "**심의 시작**을 다시 눌러 주세요."
+                    )
+                    st.caption(str(e))
+                    st.session_state.p1_estate_log = None
                 except Exception:
                     st.error("심의 진행 중 오류가 발생했습니다.")
                     tb = traceback.format_exc()

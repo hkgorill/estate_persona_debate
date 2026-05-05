@@ -45,8 +45,8 @@ st.info(
 with st.expander("개발자 참고"):
     st.markdown(
         "- 공통: `gemini_common.py` (키 로드, LLM 팩토리, 사이드바 모델 UI)\n"
-        "- 부동산 로직: `debate_estate.py`\n"
+        "- 부동산 로직: `debate_estate.py` (위원 3·의장 **통합 단일 호출**)\n"
         "- 기사/주식 논평 프리셋: `persona_presets.py`\n"
-        "- 논평 LangChain 공통: `article_persona_chains.py`\n"
+        "- 논평 LangChain 공통: `article_persona_chains.py` (조언자 3·사회자 **통합 단일 호출**)\n"
         "- UI: `app.py`(홈), `pages/1_*.py` ~ `4_*.py`"
     )

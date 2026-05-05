@@ -58,6 +58,97 @@ SYSTEM_PROMPT_CHAIR_SUMMARY = """당신은 위원회의 의장입니다. 앞선 
 - 투자 권유/비권유를 단정하지 말고, 조건부 의견으로 작성하세요.
 한국어로 작성하세요."""
 
+ESTATE_UNIFIED_MARKERS: tuple[str, str, str, str] = (
+    "###MARKET###",
+    "###SKEPTIC###",
+    "###TAX###",
+    "###CHAIR###",
+)
+
+_UNIFIED_ESTATE_SYSTEM = f"""당신은 부동산 가상 투자 심의 위원회를 **한 번의 응답**으로 완료합니다.
+
+물건 정보는 사용자 메시지에 한 번만 제시됩니다. 각 역할 지침을 따르되, 같은 문장을 불필요하게 반복하지 마세요.
+
+반드시 아래 **네 개의 시작 태그**를 이 순서만 사용하고, 각 태그는 **단독 줄**에 정확히 출력합니다.
+태그 다음 줄부터 해당 역할의 본문만 작성합니다.
+
+###MARKET###
+(시장분석가 📈 발언만)
+###SKEPTIC###
+(비관론자 ⚠️ 발언만)
+###TAX###
+(세무/재무 💰 발언만)
+###CHAIR###
+(의장 종합만 — 당신이 바로 위 세 발언에서 나온 논점만 통합. 새 사실·새 가정 금지)
+
+
+【역할 지침 — 시장분석가】
+{SYSTEM_PROMPT_MARKET_ANALYST}
+
+
+【역할 지침 — 비관론자】
+{SYSTEM_PROMPT_SKEPTIC}
+
+
+【역할 지침 — 세무/재무】
+{SYSTEM_PROMPT_TAX_FINANCE}
+
+
+【역할 지침 — 의장】
+{SYSTEM_PROMPT_CHAIR_SUMMARY}
+"""
+
+
+def parse_estate_unified_response(raw: str) -> tuple[str, str, str, str]:
+    """통합 응답에서 네 구간을 분리합니다."""
+    text = (raw or "").strip()
+    tags = ESTATE_UNIFIED_MARKERS
+    out: list[str] = []
+    for i, tag in enumerate(tags):
+        start = text.find(tag)
+        if start == -1:
+            raise ValueError(f"응답에 구간 태그가 없습니다: {tag}")
+        body_start = start + len(tag)
+        if i + 1 < len(tags):
+            nxt = text.find(tags[i + 1], body_start)
+            if nxt == -1:
+                raise ValueError(f"응답에 다음 태그가 없습니다: {tags[i + 1]}")
+            out.append(text[body_start:nxt].strip())
+        else:
+            out.append(text[body_start:].strip())
+    if len(out) != 4:
+        raise ValueError("구간 분리 결과가 올바르지 않습니다.")
+    return out[0], out[1], out[2], out[3]
+
+
+def build_estate_unified_chain(
+    model_name: str,
+    temperature: float,
+    api_key: str,
+):
+    """물건 정보를 한 번만 넣고 4역할을 한 번에 생성합니다 (토큰 절감)."""
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", _UNIFIED_ESTATE_SYSTEM),
+            (
+                "human",
+                "【심의 대상 물건 정보】\n{property_text}\n\n"
+                "위 정보만 근거로 네 구간을 순서대로 작성하세요. 태그 이름·순서를 바꾸지 마세요.",
+            ),
+        ]
+    )
+    llm = make_llm(model_name, temperature, api_key)
+    chain = prompt | llm | StrOutputParser()
+
+    def _invoke(
+        property_text: str,
+        config: dict[str, Any] | None = None,
+    ) -> tuple[str, str, str, str]:
+        raw = chain.invoke({"property_text": property_text.strip()}, config=config)
+        return parse_estate_unified_response(raw)
+
+    return _invoke
+
 
 def build_estate_agent_chain(
     system_prompt: str,
