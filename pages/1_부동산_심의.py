@@ -34,7 +34,7 @@ st.caption(
 _av = export_availability()
 if _av["notion"] or _av["sheets"]:
     st.caption(
-        "기록: Notion·Sheets 환경이 감지되었습니다. 실행 후 **Notion·Google Sheets에 기록** 버튼으로 저장할 수 있습니다."
+        "기록: Notion·Sheets가 설정된 경우, 실행이 끝나면 **자동으로** 저장합니다."
     )
 
 model_name, temperature = render_sidebar_llm_settings(default_temperature=0.5)
@@ -75,8 +75,23 @@ if start:
                     with st.spinner("위원 3인·의장 통합 생성 중…"):
                         out1, out2, out3, summary = run_unified(prop, config=cfg)
                     usage_totals = merge_usage_totals(usage_cb)
+                    sid = new_session_id()
+                    export_notice = None
+                    if _av["notion"] or _av["sheets"]:
+                        with st.spinner("Notion·Google Sheets 기록 중…"):
+                            export_notice = log_estate_session(
+                                session_id=sid,
+                                property_text=prop,
+                                out1=out1,
+                                out2=out2,
+                                out3=out3,
+                                summary=summary,
+                                model_name=model_name,
+                                temperature=temperature,
+                                usage_totals=usage_totals,
+                            )
                     st.session_state.p1_estate_log = {
-                        "session_id": new_session_id(),
+                        "session_id": sid,
                         "property_text": prop,
                         "out1": out1,
                         "out2": out2,
@@ -85,6 +100,7 @@ if start:
                         "model_name": model_name,
                         "temperature": temperature,
                         "usage_totals": usage_totals,
+                        "export_notice": export_notice,
                     }
                 except ValueError as e:
                     st.error(
@@ -110,6 +126,13 @@ if not log_data:
 st.divider()
 st.subheader("심의 진행")
 
+_notice = log_data.get("export_notice")
+if _notice:
+    if "오류" in _notice:
+        st.warning(_notice)
+    else:
+        st.success(_notice)
+
 st.markdown("### 에이전트 1 — 시장분석가 📈")
 st.write(log_data["out1"])
 st.markdown("### 에이전트 2 — 비관론자 ⚠️")
@@ -123,21 +146,3 @@ st.success(log_data["summary"])
 st.caption(format_usage_caption(log_data.get("usage_totals") or {}))
 with st.expander("토큰 수 안내"):
     st.caption(USAGE_NOTE)
-
-if _av["notion"] or _av["sheets"]:
-    if st.button("Notion·Google Sheets에 기록", type="secondary", key="p1_export_btn"):
-        msg = log_estate_session(
-            session_id=log_data["session_id"],
-            property_text=log_data["property_text"],
-            out1=log_data["out1"],
-            out2=log_data["out2"],
-            out3=log_data["out3"],
-            summary=log_data["summary"],
-            model_name=log_data["model_name"],
-            temperature=log_data["temperature"],
-            usage_totals=log_data.get("usage_totals"),
-        )
-        if "오류" in msg:
-            st.warning(msg)
-        else:
-            st.success(msg)

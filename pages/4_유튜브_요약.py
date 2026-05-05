@@ -42,7 +42,7 @@ st.caption(
 _av = export_availability()
 if _av["notion"] or _av["sheets"]:
     st.caption(
-        "기록: Notion·Sheets 환경이 감지되었습니다. 실행 후 **Notion·Google Sheets에 기록**으로 저장할 수 있습니다."
+        "기록: Notion·Sheets가 설정된 경우, 요약이 끝나면 **자동으로** 저장합니다."
     )
 
 model_name, temperature = render_sidebar_llm_settings(default_temperature=0.3)
@@ -124,14 +124,28 @@ if run_clicked:
                             config=cfg,
                         )
                     usage_totals = merge_usage_totals(usage_cb)
+                    sid = new_session_id()
+                    export_notice = None
+                    if _av["notion"] or _av["sheets"]:
+                        with st.spinner("Notion·Google Sheets 기록 중…"):
+                            export_notice = log_youtube_session(
+                                session_id=sid,
+                                youtube_url=youtube_url.strip(),
+                                transcript_full=raw,
+                                summary=summary,
+                                model_name=model_name,
+                                temperature=temperature,
+                                usage_totals=usage_totals,
+                            )
                     st.session_state.p4_youtube_log = {
-                        "session_id": new_session_id(),
+                        "session_id": sid,
                         "youtube_url": youtube_url.strip(),
                         "transcript_full": raw,
                         "summary": summary,
                         "model_name": model_name,
                         "temperature": temperature,
                         "usage_totals": usage_totals,
+                        "export_notice": export_notice,
                     }
                 except Exception as e:
                     st.error("요약 생성 오류")
@@ -159,6 +173,14 @@ if not log_data:
 
 st.divider()
 st.subheader("요약")
+
+_notice = log_data.get("export_notice")
+if _notice:
+    if "오류" in _notice:
+        st.warning(_notice)
+    else:
+        st.success(_notice)
+
 st.markdown(log_data["summary"])
 
 st.caption(format_usage_caption(log_data.get("usage_totals") or {}))
@@ -170,22 +192,6 @@ with st.expander("참고: 사용한 자막 일부(미리보기)"):
         "…" if len(log_data["transcript_full"]) > 8000 else ""
     )
     st.text(preview)
-
-if _av["notion"] or _av["sheets"]:
-    if st.button("Notion·Google Sheets에 기록", type="secondary", key="p4_export_btn"):
-        msg = log_youtube_session(
-            session_id=log_data["session_id"],
-            youtube_url=log_data["youtube_url"],
-            transcript_full=log_data["transcript_full"],
-            summary=log_data["summary"],
-            model_name=log_data["model_name"],
-            temperature=log_data["temperature"],
-            usage_totals=log_data.get("usage_totals"),
-        )
-        if "오류" in msg:
-            st.warning(msg)
-        else:
-            st.success(msg)
 
 st.divider()
 st.markdown(

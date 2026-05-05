@@ -42,7 +42,7 @@ st.caption(
 _av = export_availability()
 if _av["notion"] or _av["sheets"]:
     st.caption(
-        "기록: Notion·Sheets 환경이 감지되었습니다. 실행 후 **Notion·Google Sheets에 기록**으로 저장할 수 있습니다."
+        "기록: Notion·Sheets가 설정된 경우, 실행이 끝나면 **자동으로** 저장합니다."
     )
 
 model_name, temperature = render_sidebar_llm_settings(default_temperature=0.6)
@@ -136,8 +136,30 @@ if run_clicked:
                         with st.spinner("조언자 3인·종합 통합 생성 중…"):
                             o1, o2, o3, summary = run_uni(url_disp, body, config=cfg)
                         usage_totals = merge_usage_totals(usage_cb)
+                        sid = new_session_id()
+                        export_notice = None
+                        if _av["notion"] or _av["sheets"]:
+                            with st.spinner("Notion·Google Sheets 기록 중…"):
+                                export_notice = log_article_session(
+                                    session_id=sid,
+                                    source_url=url_disp,
+                                    article_body=body,
+                                    lab1=lab1,
+                                    lab2=lab2,
+                                    lab3=lab3,
+                                    o1=o1,
+                                    o2=o2,
+                                    o3=o3,
+                                    summary=summary,
+                                    model_name=model_name,
+                                    temperature=temperature,
+                                    page_label="2 기사",
+                                    page_code="2_article",
+                                    title_prefix="[기사]",
+                                    usage_totals=usage_totals,
+                                )
                         st.session_state.p2_article_log = {
-                            "session_id": new_session_id(),
+                            "session_id": sid,
                             "source_url": url_disp,
                             "article_body": body,
                             "lab1": lab1,
@@ -150,6 +172,7 @@ if run_clicked:
                             "model_name": model_name,
                             "temperature": temperature,
                             "usage_totals": usage_totals,
+                            "export_notice": export_notice,
                         }
                     except ValueError as e:
                         st.error(
@@ -175,6 +198,13 @@ if not log_data:
 st.divider()
 st.subheader("논평 진행")
 
+_notice = log_data.get("export_notice")
+if _notice:
+    if "오류" in _notice:
+        st.warning(_notice)
+    else:
+        st.success(_notice)
+
 st.markdown(f"### {log_data['lab1']}")
 st.write(log_data["o1"])
 st.markdown(f"### {log_data['lab2']}")
@@ -188,28 +218,3 @@ st.success(log_data["summary"])
 st.caption(format_usage_caption(log_data.get("usage_totals") or {}))
 with st.expander("토큰 수 안내"):
     st.caption(USAGE_NOTE)
-
-if _av["notion"] or _av["sheets"]:
-    if st.button("Notion·Google Sheets에 기록", type="secondary", key="p2_export_btn"):
-        msg = log_article_session(
-            session_id=log_data["session_id"],
-            source_url=log_data["source_url"],
-            article_body=log_data["article_body"],
-            lab1=log_data["lab1"],
-            lab2=log_data["lab2"],
-            lab3=log_data["lab3"],
-            o1=log_data["o1"],
-            o2=log_data["o2"],
-            o3=log_data["o3"],
-            summary=log_data["summary"],
-            model_name=log_data["model_name"],
-            temperature=log_data["temperature"],
-            page_label="2 기사",
-            page_code="2_article",
-            title_prefix="[기사]",
-            usage_totals=log_data.get("usage_totals"),
-        )
-        if "오류" in msg:
-            st.warning(msg)
-        else:
-            st.success(msg)

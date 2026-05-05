@@ -95,7 +95,7 @@ Copy-Item .env.example .env
 
 ### Notion·Google Sheets 기록 (선택)
 
-1~4 페이지 실행 후 **「Notion·Google Sheets에 기록」** 버튼으로 저장할 수 있습니다.
+Notion·Sheets가 설정되어 있으면 1~4 페이지에서 **LLM 실행이 성공한 직후** 자동으로 저장됩니다. (버튼 없음)
 
 | 저장소 | 내용 |
 |--------|------|
