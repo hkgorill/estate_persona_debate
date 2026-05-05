@@ -34,6 +34,8 @@
 | LLM | LangChain + Google Gemini (`langchain-google-genai`) |
 | API 키 | 로컬 `.env` 또는 Streamlit Community Cloud **Secrets** |
 
+**Gemini 모델:** 사이드바에서 선택합니다. 기본 목록은 `gemini_common.py`의 `GEMINI_MODEL_OPTIONS`와 동일하며, 비용 절감을 위해 **`gemini-2.5-flash-lite`** 가 첫 번째(기본값)입니다. Google 정책상 **`gemini-2.0-flash`는 일부 API 키·프로젝트에서 더 이상 쓰이지 않을 수 있어** 목록에서 빠져 있습니다. 404가 나면 **다른 모델**(예: `gemini-2.5-pro`, `gemini-1.5-pro`)을 고르세요.
+
 의존성 목록은 [`requirements.txt`](./requirements.txt)를 참고하세요.
 
 ---
@@ -115,89 +117,11 @@ Copy-Item .env.example .env
    - 새 스프레드시트를 만들고, **1행**에 아래 **헤더**(영문·순서 고정)를 입력합니다.  
      `session_id`, `created_at`, `page`, `model_name`, `temperature`, `part`, `input_full`, `output_full`
    - 스프레드시트 **공유**에 서비스 계정 이메일(`…@…iam.gserviceaccount.com`)을 **편집자**로 추가합니다.
-   - 스프레드시트 URL의 **ID**를 `GOOGLE_SHEETS_SPREADSHEET_ID`에 넣고, JSON 은 `GOOGLE_SHEETS_CREDENTIALS_PATH`(파일 경로) 또는 `GOOGLE_SHEETS_CREDENTIALS_JSON`(전체 JSON 문자열)로 지정합니다.
+   - `GOOGLE_SHEETS_SPREADSHEET_ID`에는 스프레드시트 **ID** 또는 브라우저 **URL 전체**를 넣을 수 있습니다. 서비스 계정은 **`GOOGLE_SHEETS_CREDENTIALS_PATH`(파일 경로)** 가 가장 안정적입니다. `.env` 한 줄 JSON(`GOOGLE_SHEETS_CREDENTIALS_JSON`)은 따옴표·이스케이프 때문에 실패하기 쉬우며, 그럴 때는 **`GOOGLE_SHEETS_CREDENTIALS_JSON_B64`**(JSON 파일을 Base64 인코딩) 또는 파일 경로만 쓰면 됩니다. 인라인 JSON을 여러 줄로 넣으면 **그 아래 줄의 환경 변수가 통째로 로드되지 않을 수 있으므로**, 문제가 나면 `GOOGLE_SHEETS_CREDENTIALS_JSON` 항목을 **비우거나 삭제**하고 경로 변수만 두는 것이 안전합니다. **Windows 사용자 환경 변수**에 예전에 넣어 둔 `GOOGLE_SHEETS_CREDENTIALS_JSON` 은 주석 처리만으로는 사라지지 않습니다. `.env`에 빈 줄 `GOOGLE_SHEETS_CREDENTIALS_JSON=` 을 두면 앱이 해당 키를 비우도록 덮어씁니다.
 
 `.env` 예시는 [`.env.example`](./.env.example)에 있습니다. Streamlit Cloud 는 **Secrets**에 동일 키명으로 넣으면 됩니다.
 
 ---
-
----
-
-##[트러블슈팅팅]Gemini API 과금 정책, Google Sheets API 연동 방법, 그리고 구글 클라우드 조직 정책 설정 과정
-
-# Google API 연동 및 클라우드 설정 가이드
-
-본 문서는 파이썬 프로젝트에서 **Gemini API**와 **Google Sheets API**를 효율적으로 연동하고, 구글 클라우드 콘솔(GCP)에서 발생하는 권한 및 조직 정책 문제를 해결하는 방법을 정리한 가이드입니다.
-
----
-
-## 1. Gemini API 과금 정책 안내
-
-### [구글 AI 스튜디오 무료 티어]
-* **Gemini 2.0 Flash / 1.5 Flash:** 분당 15회(RPM), 일일 1,500회(RPD) 무료.
-* **Gemini 1.5 Pro:** 분당 2회, 일일 50회 무료.
-* **주의사항:** 구글 클라우드(GCP) 프로젝트에 결제 수단이 등록된 경우, 무료 한도를 초과하면 종량제 요금이 발생할 수 있습니다. (예: 22원 등의 소액 결제 발생)
-
----
-
-## 2. Google Sheets API 연동 절차
-
-### 1단계: API 활성화 및 서비스 계정 생성
-1.  **Google Cloud Console** 접속 및 프로젝트 선택.
-2.  **API 및 서비스 > 라이브러리:** `Google Sheets API` 및 `Google Drive API` 검색 후 **[사용]** 클릭.
-3.  **IAM 및 관리 > 서비스 계정:** **[+ 서비스 계정 만들기]** 클릭 후 이름 설정 및 완료.
-
-### 2단계: JSON 키 발급 및 시트 공유
-1.  생성된 서비스 계정의 **[키]** 탭 이동 ➔ **[새 키 만들기]** ➔ **[JSON]** 선택 및 다운로드.
-2.  다운로드된 JSON 파일 내 `client_email` 주소 복사.
-3.  사용할 구글 시트의 **[공유]** 버튼 클릭 ➔ 복사한 이메일을 **'편집자'** 권한으로 추가.
-
----
-
-## 3. 핵심 트러블슈팅: 조직 정책 및 권한 해결
-
-### 이슈 1: "서비스 계정 키 생성 사용 중지됨" 팝업 발생
-조직 보안 정책(`iam.disableServiceAccountKeyCreation`)이 키 생성을 차단한 경우입니다.
-1.  콘솔 상단에서 **[조직(최상위 레벨)]**을 선택합니다.
-2.  **IAM 및 관리 > 조직 정책** 메뉴로 이동합니다.
-3.  `iam.disableServiceAccountKeyCreation` 제약 조건을 찾아 클릭합니다.
-4.  **[정책 수정]** ➔ 맞춤설정 ➔ **[사용 안함(Off)]**으로 변경 후 저장합니다.
-
-### 이슈 2: "정책 관리" 버튼이 비활성화된 경우
-조직 정책을 수정할 수 있는 IAM 권한이 부족한 경우입니다.
-1.  **조직 레벨**의 **IAM 및 관리 > IAM** 메뉴로 이동합니다.
-2.  본인의 계정 옆 **[편집(연필 아이콘)]** 클릭.
-3.  **[+ 다른 역할 추가]** 클릭 후 **`조직 정책 관리자(Organization Policy Administrator)`** 역할을 부여하고 저장합니다.
-4.  새로고침(F5) 후 정책 수정을 다시 진행합니다.
-
----
-
-## 4. Python 연동 코드 예시 (gspread)
-
-```python
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-
-# 권한 범위 및 인증 설정
-scope = ["[https://spreadsheets.google.com/feeds](https://spreadsheets.google.com/feeds)", "[https://www.googleapis.com/auth/drive](https://www.googleapis.com/auth/drive)"]
-creds = ServiceAccountCredentials.from_json_keyfile_name("your-key.json", scope)
-client = gspread.authorize(creds)
-
-# 시트 열기 (URL 방식 추천)
-sheet = client.open_by_url("YOUR_SPREADSHEET_URL").sheet1
-
-# 데이터 쓰기
-sheet.update(range_name="A1", values=[["Hello", "Google API"]])
-```
-
----
-
-## 5. 보안 및 관리 수칙
-* **JSON 키 파일 보안:** `.json` 키 파일은 절대 GitHub 등 퍼블릭 저장소에 업로드하지 마세요. ( `.gitignore`에 추가 필수)
-* **예산 알림 설정:** GCP 결제 메뉴의 **[예산 및 알림]**에서 월간 한도를 설정하여 예상치 못한 과금을 방지하세요.
-
----
-
 
 ## Streamlit Community Cloud (배포 시)
 
@@ -211,6 +135,7 @@ GOOGLE_API_KEY = "여기에_키"
 # NOTION_DATABASE_ID = "…"
 # GOOGLE_SHEETS_SPREADSHEET_ID = "…"
 # GOOGLE_SHEETS_CREDENTIALS_JSON = """{…서비스 계정 JSON…}"""
+# GOOGLE_SHEETS_CREDENTIALS_JSON_B64 = "…Base64…"
 ```
 
 저장 후 **재배포(Redeploy)** 하면 각 페이지에서 동일하게 키가 로드됩니다.

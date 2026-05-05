@@ -10,9 +10,11 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 
 load_dotenv()
 
+# gemini-2.0-flash 는 Google 측 정책으로 신규 API 키·일부 프로젝트에서 404 가 날 수 있음.
 GEMINI_MODEL_OPTIONS = [
-    "gemini-2.0-flash",
-    "gemini-1.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
     "gemini-1.5-pro",
 ]
 
@@ -66,7 +68,10 @@ def render_sidebar_llm_settings(*, default_temperature: float = 0.5) -> tuple[st
             "Gemini 모델",
             options=GEMINI_MODEL_OPTIONS,
             index=0,
-            help="계정에 따라 일부 모델만 허용될 수 있습니다.",
+            help=(
+                "계정·키 발급 시점에 따라 일부 모델만 허용됩니다. "
+                "`gemini-2.0-flash` 등은 신규 키에서 비활성일 수 있어 목록에서 제외했습니다."
+            ),
         )
         temperature = st.slider(
             "창의성(온도)",
@@ -88,5 +93,10 @@ def streamlit_gemini_error_hints(err_lower: str) -> None:
         st.warning("API 키·모델 권한을 확인하세요. Cloud에서는 Secrets와 재배포가 필요할 수 있습니다.")
     elif "429" in el or "quota" in el or "resource exhausted" in el:
         st.warning("요청 한도에 걸렸을 수 있습니다. 잠시 후 다시 시도하세요.")
+    elif "no longer available" in el or "new users" in el:
+        st.warning(
+            "선택한 모델이 현재 API 키(프로젝트)에서 제공되지 않습니다. "
+            "사이드바에서 **gemini-2.5-flash** 또는 **gemini-2.5-pro** 등 다른 모델로 바꿔 보세요."
+        )
     elif "404" in el or "not found" in el:
         st.warning("모델 ID를 찾지 못했습니다. 다른 모델을 선택해 보세요.")
