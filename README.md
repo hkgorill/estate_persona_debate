@@ -121,6 +121,84 @@ Copy-Item .env.example .env
 
 ---
 
+---
+
+##[트러블슈팅팅]Gemini API 과금 정책, Google Sheets API 연동 방법, 그리고 구글 클라우드 조직 정책 설정 과정
+
+# Google API 연동 및 클라우드 설정 가이드
+
+본 문서는 파이썬 프로젝트에서 **Gemini API**와 **Google Sheets API**를 효율적으로 연동하고, 구글 클라우드 콘솔(GCP)에서 발생하는 권한 및 조직 정책 문제를 해결하는 방법을 정리한 가이드입니다.
+
+---
+
+## 1. Gemini API 과금 정책 안내
+
+### [구글 AI 스튜디오 무료 티어]
+* **Gemini 2.0 Flash / 1.5 Flash:** 분당 15회(RPM), 일일 1,500회(RPD) 무료.
+* **Gemini 1.5 Pro:** 분당 2회, 일일 50회 무료.
+* **주의사항:** 구글 클라우드(GCP) 프로젝트에 결제 수단이 등록된 경우, 무료 한도를 초과하면 종량제 요금이 발생할 수 있습니다. (예: 22원 등의 소액 결제 발생)
+
+---
+
+## 2. Google Sheets API 연동 절차
+
+### 1단계: API 활성화 및 서비스 계정 생성
+1.  **Google Cloud Console** 접속 및 프로젝트 선택.
+2.  **API 및 서비스 > 라이브러리:** `Google Sheets API` 및 `Google Drive API` 검색 후 **[사용]** 클릭.
+3.  **IAM 및 관리 > 서비스 계정:** **[+ 서비스 계정 만들기]** 클릭 후 이름 설정 및 완료.
+
+### 2단계: JSON 키 발급 및 시트 공유
+1.  생성된 서비스 계정의 **[키]** 탭 이동 ➔ **[새 키 만들기]** ➔ **[JSON]** 선택 및 다운로드.
+2.  다운로드된 JSON 파일 내 `client_email` 주소 복사.
+3.  사용할 구글 시트의 **[공유]** 버튼 클릭 ➔ 복사한 이메일을 **'편집자'** 권한으로 추가.
+
+---
+
+## 3. 핵심 트러블슈팅: 조직 정책 및 권한 해결
+
+### 이슈 1: "서비스 계정 키 생성 사용 중지됨" 팝업 발생
+조직 보안 정책(`iam.disableServiceAccountKeyCreation`)이 키 생성을 차단한 경우입니다.
+1.  콘솔 상단에서 **[조직(최상위 레벨)]**을 선택합니다.
+2.  **IAM 및 관리 > 조직 정책** 메뉴로 이동합니다.
+3.  `iam.disableServiceAccountKeyCreation` 제약 조건을 찾아 클릭합니다.
+4.  **[정책 수정]** ➔ 맞춤설정 ➔ **[사용 안함(Off)]**으로 변경 후 저장합니다.
+
+### 이슈 2: "정책 관리" 버튼이 비활성화된 경우
+조직 정책을 수정할 수 있는 IAM 권한이 부족한 경우입니다.
+1.  **조직 레벨**의 **IAM 및 관리 > IAM** 메뉴로 이동합니다.
+2.  본인의 계정 옆 **[편집(연필 아이콘)]** 클릭.
+3.  **[+ 다른 역할 추가]** 클릭 후 **`조직 정책 관리자(Organization Policy Administrator)`** 역할을 부여하고 저장합니다.
+4.  새로고침(F5) 후 정책 수정을 다시 진행합니다.
+
+---
+
+## 4. Python 연동 코드 예시 (gspread)
+
+```python
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
+
+# 권한 범위 및 인증 설정
+scope = ["[https://spreadsheets.google.com/feeds](https://spreadsheets.google.com/feeds)", "[https://www.googleapis.com/auth/drive](https://www.googleapis.com/auth/drive)"]
+creds = ServiceAccountCredentials.from_json_keyfile_name("your-key.json", scope)
+client = gspread.authorize(creds)
+
+# 시트 열기 (URL 방식 추천)
+sheet = client.open_by_url("YOUR_SPREADSHEET_URL").sheet1
+
+# 데이터 쓰기
+sheet.update(range_name="A1", values=[["Hello", "Google API"]])
+```
+
+---
+
+## 5. 보안 및 관리 수칙
+* **JSON 키 파일 보안:** `.json` 키 파일은 절대 GitHub 등 퍼블릭 저장소에 업로드하지 마세요. ( `.gitignore`에 추가 필수)
+* **예산 알림 설정:** GCP 결제 메뉴의 **[예산 및 알림]**에서 월간 한도를 설정하여 예상치 못한 과금을 방지하세요.
+
+---
+
+
 ## Streamlit Community Cloud (배포 시)
 
 - 저장소를 연결한 뒤 **Main file**은 `app.py`로 두면 됩니다.
